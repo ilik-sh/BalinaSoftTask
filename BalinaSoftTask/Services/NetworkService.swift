@@ -108,40 +108,45 @@ final class NetworkService {
             return
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        let boundary = UUID().uuidString
+        let session = URLSession.shared
         
-        guard let json = try? JSONEncoder().encode(image)
-        else {
-            return
-        }
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
         
-        request.httpBody = json
-        request.addValue("multipart/form-data", forHTTPHeaderField: "Content-Type")
-        request.addValue("*/*", forHTTPHeaderField: "accept")
+        urlRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         
-        let anotherTask = URLSession.shared.dataTask(with: request, completionHandler: { data, response, error in
-            if let error = error {
-                print(error.localizedDescription)
+        var data = Data()
+        
+        data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+        data.append("Content-Disposition: form-data; name=\"name\"\r\n\r\n".data(using: .utf8)!)
+        data.append("\(image.name)".data(using: .utf8)!)
+        
+        data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+        data.append("Content-Disposition: form-data; name=\"photo\"\r\n\r\n".data(using: .utf8)!)
+        data.append("\(image.photo)".data(using: .utf8)!)
+        
+        data.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+        data.append("Content-Disposition: form-data; name=\"typeId\"\r\n\r\n".data(using: .utf8)!)
+        data.append("\(image.typeId)".data(using: .utf8)!)
+        
+        data.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        session.uploadTask(with: urlRequest, from: data, completionHandler: { responseData, response, error in
+            
+            if error != nil {
+                print("\(error!.localizedDescription)")
+            }
+            
+            guard let responseData = responseData else {
+                print("no response data")
                 return
             }
             
-            guard let response = response else {
-                print(response.debugDescription)
-                return
+            if let responseString = String(data: responseData, encoding: .utf8) {
+                print("uploaded to: \(responseString)")
             }
-            
-            guard let data = data else {
-                return
-            }
-            guard let json = try? JSONDecoder().decode(Response.self, from: data) else {
-                return
-            }
-            
-            print(json.status)
-
-        })
-        anotherTask.resume()
+        }).resume()
         
     }
 }
